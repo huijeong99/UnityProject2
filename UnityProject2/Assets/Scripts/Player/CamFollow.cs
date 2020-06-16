@@ -30,8 +30,8 @@ public class CamFollow : MonoBehaviour
         //FollowTarget();
         SwitchSight();
 
-        //스페이스를 눌렀을 때
-        if (Input.GetKey(KeyCode.Space))
+        //C(Camera)를 눌렀을 때
+        if (Input.GetKey(KeyCode.C))
         {
             //현재 시점이 1인칭일때
             if (outSight == false)
