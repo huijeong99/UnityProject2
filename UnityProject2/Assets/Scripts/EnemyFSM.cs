@@ -16,6 +16,9 @@ public class EnemyFSM : MonoBehaviour
     Vector3 startPoint;
     CharacterController cc;
 
+    //애니매이션 컨트롤러
+    Animator anim;
+
     int hp = 100;
     int att = 5;
     float speed = 5.0f;
@@ -43,6 +46,7 @@ public class EnemyFSM : MonoBehaviour
 
 
     #region "Return 상태에 필요한 변수들"
+    Quaternion startRotation;
     #endregion
 
     #region "Damaged 상태에 필요한 변수들"
@@ -57,8 +61,10 @@ public class EnemyFSM : MonoBehaviour
 
         state = EnemyState.Idle;
         startPoint = transform.position;
+        startRotation = transform.rotation;
         player = GameObject.Find("Player").transform;//플레이어 불러오기
         cc = GetComponent<CharacterController>();
+        anim = GetComponentInChildren<Animator>();  //자식개체에서 애니메이터 가져오기
     }
 
  
@@ -108,6 +114,9 @@ public class EnemyFSM : MonoBehaviour
         {
             state = EnemyState.Move;
             print("상태전환 : Idle -> Move");
+
+            //애니메이션
+            anim.SetTrigger("Move");
         }
     }
 
@@ -123,6 +132,13 @@ public class EnemyFSM : MonoBehaviour
         {
             state = EnemyState.Return;
             print("상태전환 : Move -> Return");
+
+            //Vector3 dir = (player.position - transform.position).normalized;
+            //transform.rotation = Quaternion.Lerp(transform.rotation,
+            //  Quaternion.LookRotation(dir),
+            //  10 * Time.deltaTime);
+            //애니메이션
+            anim.SetTrigger("Return");
         }
         else if (Vector3.Distance(transform.position,player.transform.position)>attackRange)
         {
@@ -157,11 +173,14 @@ public class EnemyFSM : MonoBehaviour
             //단 내부적으로 시간처리를 하기때문에 
             //Time.deltaTime을 사용하지 않는다
             cc.SimpleMove(dir * speed);
+            //애니메이션
+            anim.SetTrigger("Move");
         }
         else//공격범위 ㅇㄴ에 들어왔을떄
         {
             state = EnemyState.Attack;
             print("상태전환 : Move -> Attack");
+            anim.SetTrigger("Attack");
         }
     }
 
@@ -186,6 +205,7 @@ public class EnemyFSM : MonoBehaviour
 
                 //타이머 초기화
                 timer = 0f;
+                anim.SetTrigger("Attack");
             }
         }
         else//현재상태를 무브로 전환하기 (재추격)
@@ -194,6 +214,7 @@ public class EnemyFSM : MonoBehaviour
             print("상태전환 : Attack -> Move");
             //타이머 초기화
             timer = 0f;
+            anim.SetTrigger("Move");
         }
 
     }
@@ -210,14 +231,19 @@ public class EnemyFSM : MonoBehaviour
         if (Vector3.Distance(transform.position, startPoint) > 0.1)
         {
             Vector3 dir = (startPoint - transform.position).normalized;
+            anim.SetTrigger("Return");
             cc.SimpleMove(dir * speed);
+            
         }
         else
         {
             //위치값을 초기값으로 
             transform.position = startPoint;
+            //transform.rotation = startRotation;
+            transform.rotation = Quaternion.identity;//0으로 초기화
             state = EnemyState.Idle;
             print("상태전환 : Return -> Idle");
+            anim.SetTrigger("Idle");
         }
     }
 
