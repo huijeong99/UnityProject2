@@ -1,6 +1,7 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.AI;
 
 //몬스터 유한상태머신
 public class EnemyFSM : MonoBehaviour
@@ -45,6 +46,17 @@ public class EnemyFSM : MonoBehaviour
     //애니메이션을 제어하기 위한 애니메이터 컴포넌트
     Animator anim;
 
+    //유니티 길찾기 알고리즘이 적용된 네비게이션을 사용하려면 반드시 UnityEngine.AI를 추가해야 한다
+    //네비게이션이 2D에서 했던 길찾기 알고리즘보다 성능이 좋다
+    //2D기반은 본인 위치에서 실시간으로 계산을 해야 하는 반면
+    //유니티 네비게이션은 맵전체를 베이크를 해서 에이전트가 어느 위치에 있던 미리 계산된 정보를 사용한다
+    NavMeshAgent agent;
+    //참고로 충돌은 콜리더로 하고 
+    //이동만 네비메시에이전트를 사용해야 
+    //EnemyFSM대로 제대로 사용할 수 있다
+    //충돌이 제대로 작동안할 수도 있다
+    //따라서 시작할때 네비메시에이전트는 꺼줘야 한다
+
     ///몬스터 일반변수
     int hp = 100; //체력
     int att = 5; //공격력
@@ -68,6 +80,10 @@ public class EnemyFSM : MonoBehaviour
         cc = GetComponent<CharacterController>();
         //애니메이터 컴포넌트
         anim = GetComponentInChildren<Animator>();
+
+        //네비메시에이전트 가져오기
+        agent = GetComponent<NavMeshAgent>();
+        agent.enabled = false;
     }
 
     void Update()
@@ -124,6 +140,9 @@ public class EnemyFSM : MonoBehaviour
     //이동상태
     private void Move()
     {
+        //시작할때 꺼주고 무브상태가 아닐때 꺼줘야 한다
+        if (!agent.enabled) agent.enabled = true;
+
         //1. 플레이어를 향해 이동 후 공격범위 안에 들어오면 공격상태로 변경
         //2. 플레이어를 추격하더라도 처음위치에서 일정범위를 넘어가면 리턴상태로 변경
         //- 플레이어 처럼 캐릭터컨트롤러를 이용하기
@@ -132,7 +151,7 @@ public class EnemyFSM : MonoBehaviour
         //- 상태전환 출력
 
         //이동중 이동할 수 있는 최대범위에 들어왔을때
-        if(Vector3.Distance(transform.position, startPoint) > moveRange)
+        if (Vector3.Distance(transform.position, startPoint) > moveRange)
         {
             state = EnemyState.Return;
             print("상태전환 : Move -> Return");
@@ -141,6 +160,12 @@ public class EnemyFSM : MonoBehaviour
         //리턴상태가 아니면 플레이어를 추격해야 한다
         else if(Vector3.Distance(transform.position, player.position) > attackRange)
         {
+            //플레이어를 향해서 이동해라
+            //네비메시에이전트가 회전처리부터 이동까지 전부다 처리해준다
+            agent.SetDestination(player.position);
+
+
+            /*
             //플레이어를 추격
             //이동방향 (벡터의 뺄셈)
             Vector3 dir = (player.position - transform.position).normalized;
@@ -172,6 +197,7 @@ public class EnemyFSM : MonoBehaviour
             //단 내부적으로 시간처리를 하기때문에 
             //Time.deltaTime을 사용하지 않는다
             cc.SimpleMove(dir * speed);
+            */
         }
         else //공격범위 안에 들어옴
         {
@@ -184,6 +210,9 @@ public class EnemyFSM : MonoBehaviour
     //공격상태
     private void Attack()
     {
+        //에이전트 오프
+        agent.enabled = false;
+
         //1. 플레이어가 공격범위 안에 있다면 일정한 시간 간격으로 플레이어 공격
         //2. 플레이어가 공격범위를 벗어나면 이동상태(재추격)로 변경
         //- 공격범위 1미터
@@ -191,8 +220,11 @@ public class EnemyFSM : MonoBehaviour
         //- 상태전환 출력
 
         //공격범위안에 들어옴
-        if(Vector3.Distance(transform.position, player.position) < attackRange)
+        if (Vector3.Distance(transform.position, player.position) < attackRange)
         {
+            //공격할때 거리로만 처리되다보니 엉뚱한곳을 공격할 수 있다
+            transform.LookAt(player.position);
+
             //일정 시간마다 플레이어를 공격하기
             timer += Time.deltaTime;
             if(timer > attTime)
@@ -203,7 +235,7 @@ public class EnemyFSM : MonoBehaviour
 
                 //타이머 초기화
                 timer = 0f;
-
+                
                 anim.SetTrigger("Attack");
             }
         }
@@ -229,12 +261,15 @@ public class EnemyFSM : MonoBehaviour
         //도착하면 대기상태로 변경
         if(Vector3.Distance(transform.position, startPoint) > 0.1)
         {
-             Vector3 dir = (startPoint - transform.position).normalized;
-             //최종적으로 자연스런 회전처리를 하려면 결국 쿼터니온을 사용해야 한다
-             transform.rotation = Quaternion.Lerp(transform.rotation,
-                Quaternion.LookRotation(dir),
-                10 * Time.deltaTime);
-             cc.SimpleMove(dir * speed);
+            //복귀
+            agent.SetDestination(startPoint);
+
+            //Vector3 dir = (startPoint - transform.position).normalized;
+            // //최종적으로 자연스런 회전처리를 하려면 결국 쿼터니온을 사용해야 한다
+            // transform.rotation = Quaternion.Lerp(transform.rotation,
+            //    Quaternion.LookRotation(dir),
+            //    10 * Time.deltaTime);
+            // cc.SimpleMove(dir * speed);
         }
         else
         {
@@ -246,6 +281,8 @@ public class EnemyFSM : MonoBehaviour
             state = EnemyState.Idle;
             print("상태전환 : Return -> Idle");
             anim.SetTrigger("Idle");
+            //에이전트 오프
+            agent.enabled = false;
         }
     }
     //플레이어쪽에서 충돌감지를 할 수 있으니 이함수는 퍼블릭으로 만들자
@@ -321,6 +358,8 @@ public class EnemyFSM : MonoBehaviour
     {
         //캐릭터컨트롤러 비활성화
         cc.enabled = false;
+        //에이전트 오프
+        agent.enabled = false;
 
         //2초후에 자기자신을 제거한다
         yield return new WaitForSeconds(2.0f);
